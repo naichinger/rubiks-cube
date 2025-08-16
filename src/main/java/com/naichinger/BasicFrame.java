@@ -3,15 +3,14 @@ package com.naichinger;
 import static com.jogamp.opengl.GL.GL_ARRAY_BUFFER;
 import static com.jogamp.opengl.GL.GL_COLOR_BUFFER_BIT;
 import static com.jogamp.opengl.GL.GL_DEPTH_BUFFER_BIT;
-import static com.jogamp.opengl.GL.GL_DEPTH_TEST;
 import static com.jogamp.opengl.GL.GL_STATIC_DRAW;
 
-import java.awt.Event;
+import java.awt.event.KeyEvent;
+import java.awt.event.KeyListener;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.awt.event.MouseMotionListener;
 import java.nio.FloatBuffer;
-import java.util.ArrayList;
 
 // window
 import javax.swing.JFrame;
@@ -33,7 +32,7 @@ import com.jogamp.opengl.util.glsl.ShaderCode;
 import com.jogamp.opengl.util.glsl.ShaderProgram;
 import com.jogamp.opengl.util.glsl.ShaderState;
 
-public class BasicFrame extends JFrame implements GLEventListener, MouseListener, MouseMotionListener {
+public class BasicFrame extends JFrame implements GLEventListener, MouseListener, MouseMotionListener, KeyListener {
 	private static final long serialVersionUID = 123L;
 
 	final private int width = 800; // width and ...
@@ -51,15 +50,7 @@ public class BasicFrame extends JFrame implements GLEventListener, MouseListener
 
 	private ShaderState st;
 
-	TransformationNode rootNode;
-	TransformationNode cubeRotationNode;
-	TransformationNode[][] models;
-
-	TransformationNode[][][][] referenceModel;
-
-	public static Matrix4f projection;
-	public static Matrix4f view;
-	public static Matrix4f model;
+	RubiksCube cube;
 
 	Vec2f mousePos = new Vec2f();
 
@@ -75,6 +66,7 @@ public class BasicFrame extends JFrame implements GLEventListener, MouseListener
 		GLCanvas canvas = new GLCanvas(capabilities);
 		canvas.addGLEventListener(this);
 		canvas.addMouseListener(this);
+		canvas.addKeyListener(this);
 		canvas.addMouseMotionListener(this);
 
 		// to refresh the display regularly we need an animator
@@ -96,6 +88,8 @@ public class BasicFrame extends JFrame implements GLEventListener, MouseListener
 
 	long frames = 0;
 
+	float currRotation = 0;
+
 	// called repeatedly
 	@Override
 	public void display(GLAutoDrawable drawable) {
@@ -107,21 +101,29 @@ public class BasicFrame extends JFrame implements GLEventListener, MouseListener
 		gl.glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		st.useProgram(gl, true);
 
-		Matrix4f rot = new Matrix4f().setToRotationEuler(new Vec3f(0, 0.01f,0));
-		Matrix4f rotNeg = new Matrix4f().setToRotationEuler(new Vec3f(0,-0.01f,0));
+		// float rotationIncrement = .01f;
 
-		int j = 2;
-		for (int i = 0; i < 21; i++) {
-			if (models[j][i] != null) {
-				models[j][i].setMatrix(new Matrix4f().mul(rot, models[j][i].getMatrix()));
-			}
-			if (models[j + 1][i] != null) {
-				// models[j+1][i].setMatrix(new Matrix4f().mul(rotNeg,
-				// models[j+1][i].getMatrix()));
-			}
-		}
+		// if (false) {
+		// float nintyDegreeRad = (float) Math.toRadians(90);
 
-		rootNode.render(gl, new Matrix4f(), new Matrix4f());
+		// if (nintyDegreeRad - currRotation < rotationIncrement) {
+		// rotationIncrement = nintyDegreeRad - currRotation;
+		// }
+
+		// Matrix4f rot = new Matrix4f().setToRotationEuler(new Vec3f(0,
+		// rotationIncrement, 0));
+		// Matrix4f rotNeg = new Matrix4f().setToRotationEuler(new Vec3f(0,
+		// -rotationIncrement, 0));
+
+		// for (int i = 0; i < 5; i++) {
+		// for (int j = 0; j < 5; j++) {
+		// cube[i][0][j].setMatrix(new Matrix4f().mul(rot, cube[i][0][j].getMatrix()));
+		// }
+		// }
+		// }
+		// currRotation += rotationIncrement;
+
+		cube.render(gl, new Matrix4f(), new Matrix4f());
 
 		st.useProgram(gl, false);
 		gl.glFlush();
@@ -148,133 +150,7 @@ public class BasicFrame extends JFrame implements GLEventListener, MouseListener
 		gl.glBufferData(GL_ARRAY_BUFFER, vertexBufferData.capacity() * Float.BYTES, vertexBufferData, GL_STATIC_DRAW);
 		gl.glBindBuffer(GL_ARRAY_BUFFER, 0);
 
-		rootNode = new TransformationNode(st);
-
-		Matrix4f scaleMatrix = new Matrix4f().setToScale(0.15f, 0.15f, 0.15f);
-		Matrix4f translateMatrix = new Matrix4f().setToTranslation(new Vec3f(0, 0, 0.1f));
-
-		rootNode.setMatrix(new Matrix4f().mul(translateMatrix, scaleMatrix));
-
-		cubeRotationNode = new TransformationNode(st);
-
-		rootNode.addChild(cubeRotationNode);
-
-		models = new TransformationNode[6][21];
-
-		referenceModel = new TransformationNode[3][3][3][3];
-
-		for (int y = -1; y <= 1; y++) {
-			for (int x = -1; x <= 1; x++) {
-				for (int i = -1; i <= 1; i += 2) {
-
-					// z
-					ModelNode zSurface = new ModelNode(st, vbID, new Vec3f(0, (i + 1) / 2, (-i + 1) / 2));
-					TransformationNode zTranslate = new TransformationNode(st);
-					zTranslate.setMatrix(new Matrix4f().setToTranslation(2.5f * x, 2.5f * y, 3.5f * i));
-
-					models[(i + 1) / 2][3 * (y + 1) + (x + 1)] = zTranslate;
-					if (y != 0) { // on the edge
-						models[2 + (y + 1) / 2][9 + 3 * (i + 1) / 2 + (x + 1)] = zTranslate;
-					}
-					if (x != 0) { // on the edge
-						models[4 + (x + 1) / 2][9 + 6 + 3 * (i + 1) / 2 + (y + 1)] = zTranslate;
-					}
-					referenceModel[x+1][y+1][i+1][2] = zTranslate;
-
-					// y
-					ModelNode ySurface = new ModelNode(st, vbID, new Vec3f(1, 1, (i + 1) / 2));
-					TransformationNode yTranslate = new TransformationNode(st);
-					Matrix4f yTranslateMatrix = new Matrix4f().setToTranslation(2.5f * x, 3.5f * i, 2.5f * y);
-					Matrix4f yRotateMatrix = new Matrix4f().setToRotationAxis((float) Math.toRadians(90),
-							new Vec3f(1, 0, 0));
-					yTranslate.setMatrix(new Matrix4f().mul(yTranslateMatrix, yRotateMatrix));
-
-					if (y != 0) { // on the edge
-						models[(y + 1) / 2][9 + 3 * (i + 1) / 2 + (x + 1)] = yTranslate;
-					}
-					models[2 + (i + 1) / 2][3 * (y + 1) + (x + 1)] = yTranslate;
-					if (x != 0) { // on the edge
-						models[4 + (x + 1) / 2][9 + 3 * (i + 1) / 2 + (y + 1)] = yTranslate;
-					}
-					referenceModel[x+1][y+1][i+1][1] = yTranslate;
-
-					// x
-					ModelNode xSurface = new ModelNode(st, vbID, new Vec3f(1, 0.5f * (i + 1) / 2, 0));
-					TransformationNode xTranslate = new TransformationNode(st);
-					Matrix4f xTranslateMatrix = new Matrix4f().setToTranslation(3.5f * i, 2.5f * x, 2.5f * y);
-					Matrix4f xRotateMatrix = new Matrix4f().setToRotationAxis((float) Math.toRadians(90),
-							new Vec3f(0, 1, 0));
-					xTranslate.setMatrix(new Matrix4f().mul(xTranslateMatrix, xRotateMatrix));
-
-					if (y != 0) { // on the edge
-						// models[(y + 1) / 2][9 + 6 + 3 * (y + 1) / 2 + (x + 1)] = xTranslate;
-						models[(y + 1) / 2][9 + 6 + 3 * (i + 1) / 2 + (x + 1)] = xTranslate;
-					}
-					if (x != 0) { // on the edge
-						models[2 + (x + 1) / 2][9 + 6 + 3 * (i + 1) / 2 + (y + 1)] = xTranslate;
-					}
-					models[4 + (i + 1) / 2][3 * (y + 1) + (x + 1)] = xTranslate;
-					referenceModel[x+1][y+1][i+1][0] = xTranslate;
-					
-					xTranslate.addChild(xSurface);
-					yTranslate.addChild(ySurface);
-					zTranslate.addChild(zSurface);
-
-					cubeRotationNode.addChild(xTranslate);
-					cubeRotationNode.addChild(yTranslate);
-					cubeRotationNode.addChild(zTranslate);
-
-				}
-			}
-		}
-
-
-
-		// if(false) {
-		// 	models[2][9] = null;
-		// 	models[2][10] = null;
-		// 	models[2][10] = null;
-		// }
-
-		// if(true)
-		// 	return;
-
-		// Matrix4f rot = new Matrix4f().setToRotationEuler(new Vec3f(0, 0, (float) Math.toRadians(90)));
-		// for (int i = 0; i < models[0].length; i++) {
-		// 	models[0][i].setMatrix(new Matrix4f().mul(rot, models[0][i].getMatrix()));
-		// }
-
-		// // 9x front
-		// // 3x edge
-		// // 3x edge
-		// // 3x edge
-		// // 3x edge
-
-		// // 0 zf 1 zb 2 yu 3 yd 4 xl 5 xr
-
-		// if (false) {
-		// 	int offset = 9;
-		// 	TransformationNode[] tmp = new TransformationNode[3];
-		// 	for (int i = 0; i < 3; i++) {
-		// 		tmp[i] = models[2][offset + i];
-		// 	}
-		// 	for (int i = 0; i < 4; i++) {
-		// 		for (int j = 0; j < tmp.length; j++) {
-		// 			TransformationNode t = models[2 + (i + 1) % 4][offset + j];
-		// 			models[2 + (i + 1) % 4][offset + j] = tmp[j];
-		// 			tmp[j] = t;
-		// 		}
-		// 	}
-		
-
-		// Matrix4f rot45 = new Matrix4f().setToRotationEuler(new Vec3f(0, (float) Math.toRadians(45), 0));
-		// for (int i = 0; i < models[0].length; i++) {
-		// 	models[3][i].setMatrix(new Matrix4f().mul(rot45, models[3][i].getMatrix()));
-		// }
-		// }
-		// System.out.println();
-
-
+		cube = new RubiksCube(3, st, vbID);
 	}
 
 	@Override
@@ -308,6 +184,41 @@ public class BasicFrame extends JFrame implements GLEventListener, MouseListener
 		st.attachShaderProgram(gl, sp, false);
 	}
 
+	@Override
+	public void mouseDragged(MouseEvent e) {
+		Vec2f mouseReleasePos = new Vec2f(e.getX(), e.getY());
+		Vec2f mouseDiff = new Vec2f().minus(mouseReleasePos, mousePos);
+		mousePos = mouseReleasePos;
+
+		Matrix4f rotate = new Matrix4f()
+				.setToRotationEuler(new Vec3f(-mouseDiff.y() / 100.f, -mouseDiff.x() / 100.f, 0));
+		rotate.mul(cube.getModelMatrix());
+
+		cube.setModelMatrix(rotate);
+	}
+
+	@Override
+	public void keyReleased(KeyEvent e) {
+		if (e.getKeyCode() == KeyEvent.VK_1) {
+			System.out.println("1");
+		} else if (e.getKeyCode() == KeyEvent.VK_2) {
+			System.out.println("2");
+
+		} else if (e.getKeyCode() == KeyEvent.VK_3) {
+			System.out.println("3");
+
+		} else if (e.getKeyCode() == KeyEvent.VK_4) {
+			System.out.println("4");
+
+		} else if (e.getKeyCode() == KeyEvent.VK_5) {
+			System.out.println("5");
+
+		} else if (e.getKeyCode() == KeyEvent.VK_6) {
+			System.out.println("6");
+
+		}
+	}
+
 	public void main() {
 
 	}
@@ -334,20 +245,14 @@ public class BasicFrame extends JFrame implements GLEventListener, MouseListener
 	}
 
 	@Override
-	public void mouseDragged(MouseEvent e) {
-		Vec2f mouseReleasePos = new Vec2f(e.getX(), e.getY());
-		Vec2f mouseDiff = new Vec2f().minus(mouseReleasePos, mousePos);
-		mousePos = mouseReleasePos;
-
-		Matrix4f rotate = new Matrix4f()
-				.setToRotationEuler(new Vec3f(-mouseDiff.y() / 100.f, -mouseDiff.x() / 100.f, 0));
-		rotate.mul(cubeRotationNode.getMatrix());
-
-		cubeRotationNode.setMatrix(rotate);
-	}
-
-	@Override
 	public void mouseMoved(MouseEvent e) {
 	}
 
+	@Override
+	public void keyTyped(KeyEvent e) {
+	}
+
+	@Override
+	public void keyPressed(KeyEvent e) {
+	}
 }
