@@ -50,9 +50,10 @@ public class BasicFrame extends JFrame implements GLEventListener, MouseListener
 
 	private ShaderState st;
 
-	RubiksCube cube;
-
+	RubiksCube cube;	
+	TransformationNode rootNode;
 	Vec2f mousePos = new Vec2f();
+	long lastFrameTimeNano = System.nanoTime();
 
 	public BasicFrame() {
 		super("CG LAB");
@@ -86,10 +87,6 @@ public class BasicFrame extends JFrame implements GLEventListener, MouseListener
 		canvas.requestFocusInWindow();
 	}
 
-	long frames = 0;
-
-	float currRotation = 0;
-
 	// called repeatedly
 	@Override
 	public void display(GLAutoDrawable drawable) {
@@ -101,33 +98,16 @@ public class BasicFrame extends JFrame implements GLEventListener, MouseListener
 		gl.glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		st.useProgram(gl, true);
 
-		// float rotationIncrement = .01f;
+		long newFrameTimeNano = System.nanoTime();
 
-		// if (false) {
-		// float nintyDegreeRad = (float) Math.toRadians(90);
+		cube.updateCube(newFrameTimeNano - lastFrameTimeNano);
 
-		// if (nintyDegreeRad - currRotation < rotationIncrement) {
-		// rotationIncrement = nintyDegreeRad - currRotation;
-		// }
-
-		// Matrix4f rot = new Matrix4f().setToRotationEuler(new Vec3f(0,
-		// rotationIncrement, 0));
-		// Matrix4f rotNeg = new Matrix4f().setToRotationEuler(new Vec3f(0,
-		// -rotationIncrement, 0));
-
-		// for (int i = 0; i < 5; i++) {
-		// for (int j = 0; j < 5; j++) {
-		// cube[i][0][j].setMatrix(new Matrix4f().mul(rot, cube[i][0][j].getMatrix()));
-		// }
-		// }
-		// }
-		// currRotation += rotationIncrement;
-
-		cube.render(gl, new Matrix4f(), new Matrix4f());
+		rootNode.render(gl, new Matrix4f(), new Matrix4f());
 
 		st.useProgram(gl, false);
 		gl.glFlush();
-		frames += 1;
+
+		lastFrameTimeNano = newFrameTimeNano;
 	}
 
 	@Override
@@ -150,7 +130,14 @@ public class BasicFrame extends JFrame implements GLEventListener, MouseListener
 		gl.glBufferData(GL_ARRAY_BUFFER, vertexBufferData.capacity() * Float.BYTES, vertexBufferData, GL_STATIC_DRAW);
 		gl.glBindBuffer(GL_ARRAY_BUFFER, 0);
 
+		Matrix4f scaleMatrix = new Matrix4f().setToScale(0.15f, 0.15f, 0.15f);
+		Matrix4f translateMatrix = new Matrix4f().setToTranslation(new Vec3f(0, 0, 0.1f));
+		rootNode = new TransformationNode(st);
+		rootNode.setMatrix(new Matrix4f().mul(translateMatrix, scaleMatrix));
+
 		cube = new RubiksCube(3, st, vbID);
+
+		rootNode.addChild(cube);
 	}
 
 	@Override
@@ -192,30 +179,31 @@ public class BasicFrame extends JFrame implements GLEventListener, MouseListener
 
 		Matrix4f rotate = new Matrix4f()
 				.setToRotationEuler(new Vec3f(-mouseDiff.y() / 100.f, -mouseDiff.x() / 100.f, 0));
-		rotate.mul(cube.getModelMatrix());
+		rotate.mul(rootNode.getMatrix());
 
-		cube.setModelMatrix(rotate);
+		rootNode.setMatrix(rotate);
 	}
 
 	@Override
 	public void keyReleased(KeyEvent e) {
 		if (e.getKeyCode() == KeyEvent.VK_1) {
-			System.out.println("1");
+			cube.startRotation(0, 0);
 		} else if (e.getKeyCode() == KeyEvent.VK_2) {
-			System.out.println("2");
-
+			cube.startRotation(0, 1);
 		} else if (e.getKeyCode() == KeyEvent.VK_3) {
-			System.out.println("3");
-
+			cube.startRotation(0, 2);
 		} else if (e.getKeyCode() == KeyEvent.VK_4) {
-			System.out.println("4");
-
+			cube.startRotation(1, 0);
 		} else if (e.getKeyCode() == KeyEvent.VK_5) {
-			System.out.println("5");
-
+			cube.startRotation(1, 1);
 		} else if (e.getKeyCode() == KeyEvent.VK_6) {
-			System.out.println("6");
-
+			cube.startRotation(1, 2);
+		} else if (e.getKeyCode() == KeyEvent.VK_7) {
+			cube.startRotation(2, 0);
+		} else if (e.getKeyCode() == KeyEvent.VK_8) {
+			cube.startRotation(2, 1);
+		} else if (e.getKeyCode() == KeyEvent.VK_9) {
+			cube.startRotation(2, 2);
 		}
 	}
 
