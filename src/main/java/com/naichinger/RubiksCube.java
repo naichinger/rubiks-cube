@@ -1,6 +1,5 @@
 package com.naichinger;
 
-import com.jogamp.opengl.GL3;
 import com.jogamp.opengl.math.Matrix4f;
 import com.jogamp.opengl.math.Vec3f;
 import com.jogamp.opengl.util.glsl.ShaderState;
